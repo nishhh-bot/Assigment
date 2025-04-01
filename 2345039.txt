@@ -1,0 +1,271 @@
+Phase 1
+
+import pandas as pd
+import numpy as np
+
+# 1. Load the Dataset
+# Load the CSV file
+df = pd.read_csv('your_dataset.csv')
+
+# Display the first few rows
+print("First few rows of the dataset:")
+print(df.head())
+
+# Print data types of each column
+print("\nData types of each column:")
+print(df.dtypes)
+
+# Determine the number of rows and columns
+rows, cols = df.shape
+print(f"\nNumber of rows: {rows}, Number of columns: {cols}")
+
+# 2. Initial Data Exploration
+# Identify missing values in each column
+print("\nMissing values in each column:")
+print(df.isnull().sum())
+
+# Calculate basic descriptive statistics for numerical columns
+print("\nDescriptive statistics for numerical columns:")
+print(df.describe())
+
+# Identify potential outliers using IQR method
+Q1 = df.quantile(0.25)
+Q3 = df.quantile(0.75)
+IQR = Q3 - Q1
+outliers = ((df < (Q1 - 1.5 * IQR)) | (df > (Q3 + 1.5 * IQR))).sum()
+print("\nNumber of potential outliers in each column:")
+print(outliers)
+
+# Document initial findings and observations
+print("\nInitial Findings and Observations:")
+print("1. Dataset shape:", df.shape)
+print("2. Columns with missing values:", df.columns[df.isnull().any()].tolist())
+print("3. Numeric columns:", df.select_dtypes(include=[np.number]).columns.tolist())
+print("4. Categorical columns:", df.select_dtypes(include=['object']).columns.tolist())
+print("5. Columns with potential outliers:", outliers[outliers > 0].index.tolist())
+
+Phase 2 
+
+import pandas as pd
+import numpy as np
+
+# Load dataset (from Phase 1)
+df = pd.read_csv('your_dataset.csv')
+
+# --------------------------
+# 1. Handling Missing Values
+# --------------------------
+print("\n=== Handling Missing Values ===")
+
+# Display missing values before handling
+print("Missing values before handling:")
+print(df.isnull().sum())
+
+# Strategy: Median imputation for numerical, Mode for categorical
+numerical_cols = df.select_dtypes(include=[np.number]).columns
+categorical_cols = df.select_dtypes(include=['object']).columns
+
+# Numerical imputation (median is robust to outliers)
+df[numerical_cols] = df[numerical_cols].fillna(df[numerical_cols].median())
+
+# Categorical imputation (mode preserves most common category)
+for col in categorical_cols:
+    df[col] = df[col].fillna(df[col].mode()[0])
+
+# Alternative: Drop columns with >30% missing values
+# threshold = len(df) * 0.3
+# df = df.dropna(thresh=threshold, axis=1)
+
+print("\nMissing values after handling:")
+print(df.isnull().sum())
+
+# --------------------------
+# 2. Data Type Conversion
+# --------------------------
+print("\n=== Data Type Conversion ===")
+
+# Convert date columns (example column name)
+date_cols = ['date_column']
+for col in date_cols:
+    df[col] = pd.to_datetime(df[col], errors='coerce')
+    print(f"Converted {col} to datetime")
+
+# Convert categorical columns
+cat_cols = ['category_column']
+for col in cat_cols:
+    df[col] = df[col].astype('category')
+    print(f"Converted {col} to category")
+
+# Handle numeric columns stored as objects
+num_cols = ['numeric_column']
+for col in num_cols:
+    df[col] = pd.to_numeric(df[col], errors='coerce')
+    print(f"Converted {col} to numeric")
+
+# --------------------------
+# 3. Handling Duplicates
+# --------------------------
+print("\n=== Handling Duplicates ===")
+
+# Identify duplicates (consider all columns)
+initial_count = len(df)
+duplicates = df.duplicated()
+df = df.drop_duplicates()
+removed = initial_count - len(df)
+
+print(f"Removed {removed} duplicate rows")
+print("Criteria: Rows with identical values in all columns considered duplicates")
+
+# --------------------------
+# 4. Addressing Inconsistencies
+# --------------------------
+print("\n=== Addressing Inconsistencies ===")
+
+# Standardize date format
+date_cols = ['date_column']
+for col in date_cols:
+    df[col] = df[col].dt.strftime('%Y-%m-%d')
+
+# Correct spelling errors (example)
+df['category_column'] = df['category_column'].replace({
+    'misspeled': 'correct_spelling',
+    'incorect': 'correct_spelling'
+})
+
+# Standardize text case
+text_cols = ['text_column']
+for col in text_cols:
+    df[col] = df[col].str.lower()
+
+# --------------------------
+# 5. Outlier Handling
+# --------------------------
+print("\n=== Outlier Handling ===")
+
+# Identify and cap outliers using IQR method
+numerical_cols = df.select_dtypes(include=[np.number]).columns
+
+for col in numerical_cols:
+    q1 = df[col].quantile(0.25)
+    q3 = df[col].quantile(0.75)
+    iqr = q3 - q1
+    
+    # Define bounds
+    lower_bound = q1 - 1.5*iqr
+    upper_bound = q3 + 1.5*iqr
+    
+    # Cap outliers
+    df[col] = np.where(df[col] < lower_bound, lower_bound,
+                      np.where(df[col] > upper_bound, upper_bound, df[col]))
+    
+print("Outliers capped using IQR method (1.5*IQR rule)")
+print("Justification: Preserves data points while reducing skewness in distribution")
+
+# Final cleaned dataset
+print("\nFinal cleaned dataset:")
+print(df.head())
+
+Phase 3
+
+import pandas as pd
+import numpy as np
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
+
+# Load cleaned dataset from Phase 2
+df = pd.read_csv('cleaned_dataset.csv')
+
+# --------------------------
+# 1. Feature Engineering
+# --------------------------
+print("\n=== Feature Engineering ===")
+
+# Example 1: Create customer lifetime value (CLV)
+# Rationale: Combines purchase frequency and monetary value
+if 'total_purchases' in df.columns and 'avg_purchase_value' in df.columns:
+    df['clv'] = df['total_purchases'] * df['avg_purchase_value']
+    print("Created CLV feature: total_purchases * avg_purchase_value")
+
+# Example 2: Create age groups from age
+# Rationale: Categorical age groups often more useful than continuous values
+if 'age' in df.columns:
+    bins = [0, 18, 35, 50, 100]
+    labels = ['<18', '18-35', '36-50', '50+']
+    df['age_group'] = pd.cut(df['age'], bins=bins, labels=labels)
+    print("Created age groups:", labels)
+
+# Example 3: Extract day of week from date
+# Rationale: Temporal patterns often important in analysis
+if 'purchase_date' in df.columns:
+    df['purchase_day'] = pd.to_datetime(df['purchase_date']).dt.day_name()
+    print("Extracted purchase day from date")
+
+# --------------------------
+# 2. Data Aggregation & Summarization
+# --------------------------
+print("\n=== Data Aggregation ===")
+
+# Group by category and calculate statistics
+if 'customer_segment' in df.columns and 'purchase_amount' in df.columns:
+    segment_stats = df.groupby('customer_segment')['purchase_amount'].agg(
+        ['mean', 'median', 'count', 'sum']
+    ).reset_index()
+    print("\nSegment-wise purchase statistics:")
+    print(segment_stats)
+
+# Create pivot table example
+pivot_table = pd.pivot_table(df,
+                             values='sales',
+                             index='region',
+                             columns='product_category',
+                             aggfunc=np.mean)
+print("\nPivot Table - Average Sales by Region and Product Category:")
+print(pivot_table)
+
+# --------------------------
+# 3. Data Standardization/Normalization
+# --------------------------
+print("\n=== Data Scaling ===")
+
+# Standardization (Z-score normalization)
+# Use when features have different scales and using distance-based algorithms
+scaler = StandardScaler()
+numerical_cols = df.select_dtypes(include=[np.number]).columns
+df_scaled = pd.DataFrame(scaler.fit_transform(df[numerical_cols]), 
+                        columns=numerical_cols)
+
+print("Standardization applied to numerical columns:")
+print(df_scaled.head())
+
+# Min-Max Normalization (Alternative)
+# Use when needing values between 0-1 for neural networks
+# df_normalized = pd.DataFrame(MinMaxScaler().fit_transform(df[numerical_cols]), 
+#                             columns=numerical_cols)
+
+# --------------------------
+# 4. Data Binning
+# --------------------------
+print("\n=== Data Binning ===")
+
+# Example 1: Price ranges
+if 'price' in df.columns:
+    price_bins = [0, 50, 100, 200, np.inf]
+    price_labels = ['Low', 'Medium', 'High', 'Premium']
+    df['price_category'] = pd.cut(df['price'], bins=price_bins, labels=price_labels)
+    print("Created price categories:", price_labels)
+
+# Example 2: Time-based binning
+if 'transaction_hour' in df.columns:
+    time_bins = [0, 6, 12, 18, 24]
+    time_labels = ['Night', 'Morning', 'Afternoon', 'Evening']
+    df['time_of_day'] = pd.cut(df['transaction_hour'], 
+                              bins=time_bins, 
+                              labels=time_labels,
+                              include_lowest=True)
+    print("Created time-of-day categories:", time_labels)
+
+# Show transformed dataset
+print("\nFinal transformed dataset sample:")
+print(df.head())
+
+
+
